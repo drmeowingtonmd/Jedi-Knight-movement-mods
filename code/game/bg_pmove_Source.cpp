@@ -92,7 +92,7 @@ const float	pm_swimScale = 0.50f;
 float	pm_ladderScale = 0.7f;
 
 const float	pm_accelerate = 12.0f;
-const float	pm_airaccelerate = 4.0f;
+const float	pm_airaccelerate = 10.0;
 const float	pm_wateraccelerate = 4.0f;
 const float	pm_flyaccelerate = 8.0f;
 
@@ -332,12 +332,14 @@ Handles user intended acceleration
 static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) 
 {
 	int			i;
-	float		addspeed, accelspeed, currentspeed;
+	float		addspeed, accelspeed, currentspeed, wishspd = wishspeed;
 
 	if (pm->ps->clientNum == 0) {
 		StrafeHelper_SetAccelerationValues( pml.forward, pm->ps->velocity, wishdir,
 		                                    wishspeed, accel, pml.frametime );
 	}
+	if (wishspd > 30)
+		wishspd = 30;
 
 	currentspeed = DotProduct (pm->ps->velocity, wishdir);
 
@@ -346,7 +348,36 @@ static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel )
 	if (addspeed <= 0) {
 		return;
 	}
-	accelspeed = ( accel * pml.frametime ) * wishspeed;
+	accelspeed = accel * wishspeed * pml.frametime * 4.0f;
+
+	if (accelspeed > addspeed) {
+		accelspeed = addspeed;
+	}
+	for (i=0 ; i<3 ; i++) {
+		pm->ps->velocity[i] += accelspeed * wishdir[i];	
+	}
+}
+
+static void PM_AirAccelerate( vec3_t wishdir, float wishspeed, float accel ) 
+{
+	int			i;
+	float		addspeed, accelspeed, currentspeed, wishspd = wishspeed;
+
+	if (pm->ps->clientNum == 0) {
+		StrafeHelper_SetAccelerationValues( pml.forward, pm->ps->velocity, wishdir,
+		                                    wishspeed, accel, pml.frametime );
+	}
+	if (wishspd > 30)
+		wishspd = 30;
+
+	currentspeed = DotProduct (pm->ps->velocity, wishdir);
+
+	addspeed = wishspd - currentspeed;
+	
+	if (addspeed <= 0) {
+		return;
+	}
+	accelspeed = accel * wishspeed * pml.frametime * 4.0f;
 
 	if (accelspeed > addspeed) {
 		accelspeed = addspeed;
@@ -1768,7 +1799,7 @@ static void PM_AirMove( void ) {
 	if ( pm->gent && pm->gent->client && pm->gent->client->playerTeam == TEAM_STASIS )
 	{//FIXME: do a check for movetype_float
 		//Can move fairly well in air while falling
-		PM_Accelerate (wishdir, wishspeed, pm_accelerate/2.0f);
+		PM_AirAccelerate (wishdir, wishspeed, pm_accelerate/2.0f);
 	}
 	else
 	{
@@ -1779,7 +1810,7 @@ static void PM_AirMove( void ) {
 		}
 
 		// not on ground, so little effect on velocity
-		PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
+		PM_AirAccelerate( wishdir, wishspeed, pm_airaccelerate );
 	//}
 
 	// we may have a ground plane that is very steep, even

@@ -91,8 +91,8 @@ const float	pm_duckScale = 0.50f;
 const float	pm_swimScale = 0.50f;
 float	pm_ladderScale = 0.7f;
 
-const float	pm_accelerate = 12.0f;
-const float	pm_airaccelerate = 4.0f;
+const float	pm_accelerate = 12.0f; // 12 for JK2, 15 for CPM
+const float	pm_airaccelerate = 4.0f; // was 4 for JK2
 const float	pm_wateraccelerate = 4.0f;
 const float	pm_flyaccelerate = 8.0f;
 
@@ -1695,6 +1695,36 @@ static void PM_FlyMove( void )
 	PM_StepSlideMove( 1 );
 }
 
+static void CPM_PM_Aircontrol (pmove_t *pm, vec3_t wishdir, float wishspeed )
+{
+	float	zspeed, speed, dot, k;
+	int		i;
+
+	if ( (pm->ps->movementDir && pm->ps->movementDir !=4) || wishspeed == 0.0)
+		return; // can't control movement if not moveing forward or backward
+
+	zspeed = pm->ps->velocity[2];
+	pm->ps->velocity[2] = 0;
+	speed = VectorNormalize(pm->ps->velocity);
+
+	dot = DotProduct(pm->ps->velocity,wishdir);
+	k = 4800*dot*dot*pml.frametime;
+
+
+	//if (dot > 0) {	// we can't change direction while slowing down
+		for (i=0; i < 2; i++)
+			pm->ps->velocity[i] = pm->ps->velocity[i]*speed + wishdir[i]*k;
+		VectorNormalize(pm->ps->velocity);
+	//} else {
+
+	//}
+
+	for (i=0; i < 2; i++)
+		pm->ps->velocity[i] *=speed;
+
+	pm->ps->velocity[2] = zspeed;
+}
+
 qboolean PM_GroundSlideOkay( float zNormal )
 {
 	if ( zNormal > 0 )
@@ -1719,14 +1749,16 @@ PM_AirMove
 ===================
 */
 static void PM_AirMove( void ) {
-	int			i;
-	vec3_t		wishvel;
-	float		fmove, smove;
-	vec3_t		wishdir;
-	float		wishspeed;
-	float		scale;
-	usercmd_t	cmd;
-	float		gravMod = 1.0f;
+    int         i;
+    vec3_t      wishvel;
+    float       fmove, smove;
+    vec3_t      wishdir;
+    float       wishspeed;
+    float       scale;
+    usercmd_t   cmd;
+    float       accel;
+    float       wishspeed2;
+    float       gravMod = 1.0f;
 
 #if METROID_JUMP
 	PM_CheckJump();
@@ -1734,65 +1766,68 @@ static void PM_AirMove( void ) {
 
 	PM_Friction();
 
-	fmove = pm->cmd.forwardmove;
-	smove = pm->cmd.rightmove;
+    fmove = pm->cmd.forwardmove;
+    smove = pm->cmd.rightmove;
 
-	cmd = pm->cmd;
-	scale = PM_CmdScale( &cmd );
+    cmd = pm->cmd;
+    scale = PM_CmdScale( &cmd );
 
-	// set the movementDir so clients can rotate the legs for strafing
-	PM_SetMovementDir();
+    // set the movementDir so clients can rotate the legs for strafing
+    PM_SetMovementDir();
 
-	// project moves down to flat plane
-	pml.forward[2] = 0;
-	pml.right[2] = 0;
-	VectorNormalize (pml.forward);
-	VectorNormalize (pml.right);
+    // project moves down to flat plane
+    pml.forward[2] = 0;
+    pml.right[2] = 0;
+    VectorNormalize(pml.forward);
+    VectorNormalize(pml.right);
 
-	if ( (pm->ps->pm_flags&PMF_SLOW_MO_FALL) )
-	{//no air-control
-		VectorClear( wishvel );
-	}
-	else
-	{
-		for ( i = 0 ; i < 2 ; i++ ) {
-			wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
-		}
-		wishvel[2] = 0;
-	}
+    for (i = 0; i < 2; i++) {
+        wishvel[i] = pml.forward[i] * fmove + pml.right[i] * smove;
+    }
+    wishvel[2] = 0;
 
-	VectorCopy (wishvel, wishdir);
-	wishspeed = VectorNormalize(wishdir);
+    VectorCopy(wishvel, wishdir);
+    wishspeed = VectorNormalize(wishdir);
+    wishspeed *= scale;
 
-	/*
-	if ( pm->gent && pm->gent->client && pm->gent->client->playerTeam == TEAM_STASIS )
-	{//FIXME: do a check for movetype_float
-		//Can move fairly well in air while falling
-		PM_Accelerate (wishdir, wishspeed, pm_accelerate/2.0f);
-	}
-	else
-	{
-	*/
-		if ( ( DotProduct (pm->ps->velocity, wishdir) ) < 0.0f )
-		{//Encourage deceleration away from the current velocity
-			wishspeed *= pm_airDecelRate;
-		}
+    // CPMA-style air control
+    wishspeed2 = wishspeed;
+    if (DotProduct(pm->ps->velocity, wishdir) < 0) {
+        accel = 3; // Reduces braking in the air, allowing better control
+    } else {
+        accel = pm_airaccelerate;
+    }
+    
+    if (pm->ps->movementDir == 2 || pm->ps->movementDir == 6) {
+        if (wishspeed > 30) {
+            wishspeed = 30;
+        }
+        accel = 70;
+    }
 
-		// not on ground, so little effect on velocity
-		PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
-	//}
+    if (pm->ps->pm_flags & PMF_DUCKED) {
+        // Air diving mechanic
+        float vmc = pml.msec / 4;
+        if (pm->ps->velocity[2] > 0) {
+            if (vmc > pm->ps->velocity[2]) {
+                vmc = pm->ps->velocity[2];
+            }
+            pm->ps->velocity[0] += wishdir[0] * 4 * vmc;
+            pm->ps->velocity[1] += wishdir[1] * 4 * vmc;
+        }
+        pm->ps->velocity[2] -= pml.msec / 4;
+    }
 
-	// we may have a ground plane that is very steep, even
-	// though we don't have a groundentity
-	// slide along the steep plane
-	if ( pml.groundPlane ) 
-	{
-		if ( PM_GroundSlideOkay( pml.groundTrace.plane.normal[2] ) )
-		{
-			PM_ClipVelocity( pm->ps->velocity, pml.groundTrace.plane.normal, 
-								pm->ps->velocity, OVERCLIP );
-		}
-	}
+    // Apply acceleration
+    PM_Accelerate(wishdir, wishspeed, accel);
+    CPM_PM_Aircontrol(pm, wishdir, wishspeed2);
+
+    // Handle steep ground planes
+    if (pml.groundPlane) {
+        if (PM_GroundSlideOkay(pml.groundTrace.plane.normal[2])) {
+            PM_ClipVelocity(pm->ps->velocity, pml.groundTrace.plane.normal, pm->ps->velocity, OVERCLIP);
+        }
+    }
 
 	if ( !pm->ps->clientNum
 		&& pm->ps->forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_0 
