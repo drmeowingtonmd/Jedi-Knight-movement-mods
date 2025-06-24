@@ -390,6 +390,10 @@ vmCvar_t	cg_strafeHelperColorSpeedG;
 vmCvar_t	cg_strafeHelperColorSpeedB;
 vmCvar_t	cg_strafeHelperColorSpeedA;
 
+// Additions for Movement type (source, CPM and Vanilla)
+vmCvar_t cg_MovementType;
+vmCvar_t cg_drawMovementType;
+
 typedef struct {
 	vmCvar_t	*vmCvar;
 	char		*cvarName;
@@ -573,6 +577,10 @@ Ghoul2 Insert End
 	{ &cg_strafeHelperColorSpeedG, "cg_strafeHelperColorSpeedG", "1.0", CVAR_ARCHIVE },
 	{ &cg_strafeHelperColorSpeedB, "cg_strafeHelperColorSpeedB", "1.0", CVAR_ARCHIVE },
 	{ &cg_strafeHelperColorSpeedA, "cg_strafeHelperColorSpeedA", "0.9", CVAR_ARCHIVE },
+
+	// Additions for Movement type (source, CPM and Vanilla)
+	{ &cg_MovementType, "cg_MovementType", "0", CVAR_ARCHIVE },
+	{ &cg_drawMovementType, "cg_drawMovementType", "0", CVAR_ARCHIVE },
 };
 
 int		cvarTableSize = sizeof( cvarTable ) / sizeof( cvarTable[0] );
