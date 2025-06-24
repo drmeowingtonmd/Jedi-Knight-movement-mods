@@ -693,6 +693,10 @@ extern	vmCvar_t		cg_strafeHelperColorSpeedG;
 extern	vmCvar_t		cg_strafeHelperColorSpeedB;
 extern	vmCvar_t		cg_strafeHelperColorSpeedA;
 
+// Addition for Movement Type
+extern	vmCvar_t		cg_MovementType;
+extern	vmCvar_t		cg_drawMovementType;
+
 void CG_NewClientinfo( int clientNum );
 //
 // cg_main.c

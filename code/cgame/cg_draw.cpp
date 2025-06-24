@@ -2544,6 +2544,37 @@ static float CG_DrawFormattedMilliseconds( int milliseconds, int accuracy, float
 
 /*
 =================
+CG_DrawMovementType
+=================
+*/
+static float CG_DrawMovementType(float y) {
+
+	char* movement_type;
+
+	switch (cg_MovementType.integer)
+	{
+	case 0:
+		movement_type = "Vanilla";
+		break;
+	case 1:
+		movement_type = "Source";
+		break;
+	case 2:
+		movement_type = "CPM";
+		break;
+	default:
+		movement_type = "Undefined -> Vanilla";
+		break;
+	}
+
+	const int width = cgi_R_Font_StrLenPixels(movement_type, cgs.media.qhFontMedium, 1.0f);
+	cgi_R_Font_DrawString(635 - width, y + 2, movement_type, colorTable[CT_LTGOLD1], cgs.media.qhFontMedium, -1, 1.0f);
+
+	return y + BIGCHAR_HEIGHT + 10;
+}
+
+/*
+=================
 CG_Draw2D
 =================
 */
@@ -2687,7 +2718,9 @@ static void CG_Draw2D( void )
 		y=CG_DrawFormattedMilliseconds(cgi_SpeedrunGetLevelTimeMilliseconds(),
 			cg_drawSpeedrunLevelTimer.integer - 1, y);
 	}
-
+	if (cg_drawMovementType.integer) {
+		y = CG_DrawMovementType(y);
+	}
 	if ( cg_drawOverbounceInfo.integer )
 	{
 		CG_DrawOverbounceInfo();

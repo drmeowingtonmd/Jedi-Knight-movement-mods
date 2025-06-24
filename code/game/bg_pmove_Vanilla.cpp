@@ -105,10 +105,6 @@ const float pm_airDecelRate = 1.35f;	//Used for air decelleration away from curr
 
 int	c_pmove = 0;
 
-// Addition for Movement type
-extern vmCvar_t cg_MovementType;
-const float	pm_airaccelerateSource = 10.0;
-
 extern void PM_SetTorsoAnimTimer( gentity_t *ent, int *torsoAnimTimer, int time );
 extern void PM_SetLegsAnimTimer( gentity_t *ent, int *legsAnimTimer, int time );
 //extern void PM_SetAnim(pmove_t	*pm,int setAnimParts,int anim,int setAnimFlags);
@@ -359,102 +355,6 @@ static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel )
 		pm->ps->velocity[i] += accelspeed * wishdir[i];	
 	}
 }
-
-/*
-==============
-Additions for different movement types
-==============
-*/
-static void PM_AccelerateSource(vec3_t wishdir, float wishspeed, float accel)
-{
-	int			i;
-	float		addspeed, accelspeed, currentspeed, wishspd = wishspeed;
-
-	if (pm->ps->clientNum == 0) {
-		StrafeHelper_SetAccelerationValues(pml.forward, pm->ps->velocity, wishdir,
-			wishspeed, accel, pml.frametime);
-	}
-	if (wishspd > 30)
-		wishspd = 30;
-
-	currentspeed = DotProduct(pm->ps->velocity, wishdir);
-
-	addspeed = wishspeed - currentspeed;
-
-	if (addspeed <= 0) {
-		return;
-	}
-	accelspeed = accel * wishspeed * pml.frametime * 4.0f;
-
-	if (accelspeed > addspeed) {
-		accelspeed = addspeed;
-	}
-	for (i = 0; i < 3; i++) {
-		pm->ps->velocity[i] += accelspeed * wishdir[i];
-	}
-}
-static void PM_AirAccelerateSource(vec3_t wishdir, float wishspeed, float accel)
-{
-	int			i;
-	float		addspeed, accelspeed, currentspeed, wishspd = wishspeed;
-
-	if (pm->ps->clientNum == 0) {
-		StrafeHelper_SetAccelerationValues(pml.forward, pm->ps->velocity, wishdir,
-			wishspeed, accel, pml.frametime);
-	}
-	if (wishspd > 30)
-		wishspd = 30;
-
-	currentspeed = DotProduct(pm->ps->velocity, wishdir);
-
-	addspeed = wishspd - currentspeed;
-
-	if (addspeed <= 0) {
-		return;
-	}
-	accelspeed = accel * wishspeed * pml.frametime * 4.0f;
-
-	if (accelspeed > addspeed) {
-		accelspeed = addspeed;
-	}
-	for (i = 0; i < 3; i++) {
-		pm->ps->velocity[i] += accelspeed * wishdir[i];
-	}
-}
-static void PM_Aircontrol_CPM(pmove_t* pm, vec3_t wishdir, float wishspeed)
-{
-	float	zspeed, speed, dot, k;
-	int		i;
-
-	if ((pm->ps->movementDir && pm->ps->movementDir != 4) || wishspeed == 0.0)
-		return; // can't control movement if not moveing forward or backward
-
-	zspeed = pm->ps->velocity[2];
-	pm->ps->velocity[2] = 0;
-	speed = VectorNormalize(pm->ps->velocity);
-
-	dot = DotProduct(pm->ps->velocity, wishdir);
-	k = 4800 * dot * dot * pml.frametime;
-
-
-	//if (dot > 0) {	// we can't change direction while slowing down
-	for (i = 0; i < 2; i++)
-		pm->ps->velocity[i] = pm->ps->velocity[i] * speed + wishdir[i] * k;
-	VectorNormalize(pm->ps->velocity);
-	//} else {
-
-	//}
-
-	for (i = 0; i < 2; i++)
-		pm->ps->velocity[i] *= speed;
-
-	pm->ps->velocity[2] = zspeed;
-}
-/*
-==============
-Additions for different movement types
-==============
-*/
 
 /*
 ============
@@ -1645,22 +1545,7 @@ static void PM_WaterMove( void ) {
 		if ( wishspeed > pm->ps->speed * pm_ladderScale ) {
 			wishspeed = pm->ps->speed * pm_ladderScale;
 		}
-		switch (cg_MovementType.integer)
-		{
-		case 0: // Vanilla
-			PM_Accelerate(wishdir, wishspeed, pm_flyaccelerate);
-			break;
-		case 1: // Source
-			PM_AccelerateSource(wishdir, wishspeed, pm_flyaccelerate);
-			break;
-		case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-			PM_Accelerate(wishdir, wishspeed, pm_flyaccelerate);
-			break;
-		default: // If the variable is not set correctly, go back to Vanilla
-			PM_Accelerate(wishdir, wishspeed, pm_flyaccelerate);
-			break;
-		}
-		//PM_Accelerate(wishdir, wishspeed, pm_flyaccelerate);
+		PM_Accelerate( wishdir, wishspeed, pm_flyaccelerate );
 	} else {
 		if ( pm->ps->gravity < 0 )
 		{//float up
@@ -1669,22 +1554,7 @@ static void PM_WaterMove( void ) {
 		if ( wishspeed > pm->ps->speed * pm_swimScale ) {
 			wishspeed = pm->ps->speed * pm_swimScale;
 		}
-		switch (cg_MovementType.integer)
-		{
-		case 0: // Vanilla
-			PM_Accelerate(wishdir, wishspeed, pm_wateraccelerate);
-			break;
-		case 1: // Source
-			PM_AccelerateSource(wishdir, wishspeed, pm_wateraccelerate);
-			break;
-		case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-			PM_Accelerate(wishdir, wishspeed, pm_wateraccelerate);
-			break;
-		default: // If the variable is not set correctly, go back to Vanilla
-			PM_Accelerate(wishdir, wishspeed, pm_wateraccelerate);
-			break;
-		}
-		//PM_Accelerate( wishdir, wishspeed, pm_wateraccelerate );
+		PM_Accelerate( wishdir, wishspeed, pm_wateraccelerate );
 	}
 
 	// make sure we can go up slopes easily under water
@@ -1756,22 +1626,7 @@ static void PM_FlyVehicleMove( void )
 	VectorCopy( wishvel, wishdir );
 	wishspeed = VectorNormalize( wishdir );
 
-	switch (cg_MovementType.integer)
-	{
-	case 0: // Vanilla
-		PM_Accelerate(wishdir, wishspeed, 100);
-		break;
-	case 1: // Source
-		PM_AccelerateSource(wishdir, wishspeed, 100);
-		break;
-	case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-		PM_Accelerate(wishdir, wishspeed, 100);
-		break;
-	default: // If the variable is not set correctly, go back to Vanilla
-		PM_Accelerate(wishdir, wishspeed, 100);
-		break;
-	}
-	//PM_Accelerate( wishdir, wishspeed, 100 );
+	PM_Accelerate( wishdir, wishspeed, 100 );
 
 	PM_StepSlideMove( 1 );
 }
@@ -1835,22 +1690,7 @@ static void PM_FlyMove( void )
 	VectorCopy( wishvel, wishdir );
 	wishspeed = VectorNormalize( wishdir );
 
-	switch (cg_MovementType.integer)
-	{
-	case 0: // Vanilla
-		PM_Accelerate(wishdir, wishspeed, accel);
-		break;
-	case 1: // Source
-		PM_AccelerateSource(wishdir, wishspeed, accel);
-		break;
-	case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-		PM_Accelerate(wishdir, wishspeed, accel);
-		break;
-	default: // If the variable is not set correctly, go back to Vanilla
-		PM_Accelerate(wishdir, wishspeed, accel);
-		break;
-	}
-	//PM_Accelerate( wishdir, wishspeed, accel );
+	PM_Accelerate( wishdir, wishspeed, accel );
 
 	PM_StepSlideMove( 1 );
 }
@@ -1939,22 +1779,7 @@ static void PM_AirMove( void ) {
 		}
 
 		// not on ground, so little effect on velocity
-		switch (cg_MovementType.integer)
-		{
-		case 0: // Vanilla
-			PM_Accelerate(wishdir, wishspeed, pm_airaccelerate);
-			break;
-		case 1: // Source
-			PM_AirAccelerateSource(wishdir, wishspeed, pm_airaccelerateSource);
-			break;
-		case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-			PM_Accelerate(wishdir, wishspeed, pm_airaccelerate);
-			break;
-		default: // If the variable is not set correctly, go back to Vanilla
-			PM_Accelerate(wishdir, wishspeed, pm_airaccelerate);
-			break;
-		}
-		//PM_Accelerate(wishdir, wishspeed, pm_airaccelerate);
+		PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
 	//}
 
 	// we may have a ground plane that is very steep, even
@@ -2005,138 +1830,6 @@ static void PM_AirMove( void ) {
 	PM_StepSlideMove( gravMod );
 }
 
-static void PM_AirMove_CPM(void) {
-	int         i;
-	vec3_t      wishvel;
-	float       fmove, smove;
-	vec3_t      wishdir;
-	float       wishspeed;
-	float       scale;
-	usercmd_t   cmd;
-	float       accel;
-	float       wishspeed2;
-	float       gravMod = 1.0f;
-
-#if METROID_JUMP
-	PM_CheckJump();
-#endif
-
-	PM_Friction();
-
-	fmove = pm->cmd.forwardmove;
-	smove = pm->cmd.rightmove;
-
-	cmd = pm->cmd;
-	scale = PM_CmdScale(&cmd);
-
-	// set the movementDir so clients can rotate the legs for strafing
-	PM_SetMovementDir();
-
-	// project moves down to flat plane
-	pml.forward[2] = 0;
-	pml.right[2] = 0;
-	VectorNormalize(pml.forward);
-	VectorNormalize(pml.right);
-
-	for (i = 0; i < 2; i++) {
-		wishvel[i] = pml.forward[i] * fmove + pml.right[i] * smove;
-	}
-	wishvel[2] = 0;
-
-	VectorCopy(wishvel, wishdir);
-	wishspeed = VectorNormalize(wishdir);
-	wishspeed *= scale;
-
-	// CPMA-style air control
-	wishspeed2 = wishspeed;
-	if (DotProduct(pm->ps->velocity, wishdir) < 0) {
-		accel = 3; // Reduces braking in the air, allowing better control
-	}
-	else {
-		accel = pm_airaccelerate;
-	}
-
-	if (pm->ps->movementDir == 2 || pm->ps->movementDir == 6) {
-		if (wishspeed > 30) {
-			wishspeed = 30;
-		}
-		accel = 70;
-	}
-
-	if (pm->ps->pm_flags & PMF_DUCKED) {
-		// Air diving mechanic
-		float vmc = pml.msec / 4;
-		if (pm->ps->velocity[2] > 0) {
-			if (vmc > pm->ps->velocity[2]) {
-				vmc = pm->ps->velocity[2];
-			}
-			pm->ps->velocity[0] += wishdir[0] * 4 * vmc;
-			pm->ps->velocity[1] += wishdir[1] * 4 * vmc;
-		}
-		pm->ps->velocity[2] -= pml.msec / 4;
-	}
-
-	// Apply acceleration
-	switch (cg_MovementType.integer)
-	{
-	case 0: // Vanilla
-		PM_Accelerate(wishdir, wishspeed, accel);
-		break;
-	case 1: // Source
-		PM_AccelerateSource(wishdir, wishspeed, accel);
-		break;
-	case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-		PM_Accelerate(wishdir, wishspeed, accel);
-		break;
-	default: // If the variable is not set correctly, go back to Vanilla
-		PM_Accelerate(wishdir, wishspeed, accel);
-		break;
-	}
-	//PM_Accelerate(wishdir, wishspeed, accel);
-	PM_Aircontrol_CPM(pm, wishdir, wishspeed2);
-
-	// Handle steep ground planes
-	if (pml.groundPlane) {
-		if (PM_GroundSlideOkay(pml.groundTrace.plane.normal[2])) {
-			PM_ClipVelocity(pm->ps->velocity, pml.groundTrace.plane.normal, pm->ps->velocity, OVERCLIP);
-		}
-	}
-
-	if (!pm->ps->clientNum
-		&& pm->ps->forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_0
-		&& pm->ps->forceJumpZStart
-		&& pm->ps->velocity[2] > 0)
-	{//I am force jumping and I'm not holding the button anymore
-		float curHeight = pm->ps->origin[2] - pm->ps->forceJumpZStart + (pm->ps->velocity[2] * pml.frametime);
-		float maxJumpHeight = forceJumpHeight[pm->ps->forcePowerLevel[FP_LEVITATION]];
-		if (curHeight >= maxJumpHeight)
-		{//reached top, cut velocity
-			pm->ps->velocity[2] = 0;
-			/*
-			//put on a cvar?
-			float stepCrouchAdd = STEPSIZE+(DEFAULT_MAXS_2-CROUCH_MAXS_2);
-			Com_Printf( S_COLOR_RED"capping force jump height %4.2f > %4.2f (%4.2f/%4.2f)\n",
-				curHeight, maxJumpHeight,
-				forceJumpHeight[pm->ps->forcePowerLevel[FP_LEVITATION]],
-				forceJumpHeight[pm->ps->forcePowerLevel[FP_LEVITATION]]+stepCrouchAdd );
-			*/
-		}
-	}
-	/*
-	if ( g_timescale != NULL )
-	{
-		if ( g_timescale->value < 1.0f )
-		{
-			if ( pm->ps->clientNum == 0 )
-			{
-				gravMod *= (1.0f/g_timescale->value);
-			}
-		}
-	}
-	*/
-
-	PM_StepSlideMove(gravMod);
-}
 
 /*
 ===================
@@ -2164,20 +1857,7 @@ static void PM_WalkMove( void ) {
 		if ( pm->waterlevel > 1 ) {
 			PM_WaterMove();
 		} else {
-			switch (cg_MovementType.integer)
-			{
-			case 0: // Vanilla
-				PM_AirMove();
-				break;
-			case 1: // Source, but it's 'normal' AirMove
-				PM_AirMove();
-				break;
-			case 2: // CPM
-				PM_AirMove_CPM();
-				break;
-			default: // Vanilla, Backup
-				PM_AirMove();
-			}
+			PM_AirMove();
 		}
 		return;
 	}
@@ -2194,20 +1874,7 @@ static void PM_WalkMove( void ) {
 		if ( pm->waterlevel > 1 ) {
 			PM_WaterMove();
 		} else {
-			switch (cg_MovementType.integer)
-			{
-			case 0: // Vanilla
-				PM_AirMove();
-				break;
-			case 1: // Source, but it's 'normal' AirMove
-				PM_AirMove();
-				break;
-			case 2: // CPM
-				PM_AirMove_CPM();
-				break;
-			default: // Vanilla, Backup
-				PM_AirMove();
-			}
+			PM_AirMove();
 		}
 		return;
 	}
@@ -2304,21 +1971,7 @@ static void PM_WalkMove( void ) {
 		accelerate = pm_accelerate;
 	}
 
-	switch (cg_MovementType.integer)
-		{
-		case 0: // Vanilla
-			PM_Accelerate(wishdir, wishspeed, accelerate);
-			break;
-		case 1: // Source
-			PM_AccelerateSource(wishdir, wishspeed, accelerate);
-			break;
-		case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-			PM_Accelerate(wishdir, wishspeed, accelerate);
-			break;
-		default: // If the variable is not set correctly, go back to Vanilla
-			PM_Accelerate(wishdir, wishspeed, accelerate);
-			break;
-		}
+	PM_Accelerate (wishdir, wishspeed, accelerate);
 
 	//Com_Printf("velocity = %1.1f %1.1f %1.1f\n", pm->ps->velocity[0], pm->ps->velocity[1], pm->ps->velocity[2]);
 	//Com_Printf("velocity1 = %1.1f\n", VectorLength(pm->ps->velocity));
@@ -2480,22 +2133,7 @@ static void PM_NoclipMove( void ) {
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
 
-	switch (cg_MovementType.integer)
-	{
-	case 0: // Vanilla
-		PM_Accelerate(wishdir, wishspeed, pm_accelerate);
-		break;
-	case 1: // Source
-		PM_AccelerateSource(wishdir, wishspeed, pm_accelerate);
-		break;
-	case 2: // CPM, same function as Vanilla, but THIS shouldn't happen
-		PM_Accelerate(wishdir, wishspeed, pm_accelerate);
-		break;
-	default: // If the variable is not set correctly, go back to Vanilla
-		PM_Accelerate(wishdir, wishspeed, pm_accelerate);
-		break;
-	}
-	//PM_Accelerate( wishdir, wishspeed, pm_accelerate );
+	PM_Accelerate( wishdir, wishspeed, pm_accelerate );
 
 	// move
 	VectorMA (pm->ps->origin, pml.frametime, pm->ps->velocity, pm->ps->origin);
@@ -9351,20 +8989,7 @@ void Pmove( pmove_t *pmove )
 		else
 		{
 			// airborne
-			switch (cg_MovementType.integer)
-			{
-			case 0 : // Vanilla
-				PM_AirMove();
-				break;
-			case 1 : // Source, but it's 'normal' AirMove
-				PM_AirMove();
-				break;
-			case 2 : // CPM
-				PM_AirMove_CPM();
-				break;
-			default : // Vanilla, Backup
-				PM_AirMove();
-			}
+			PM_AirMove();
 		}
 	}
 
